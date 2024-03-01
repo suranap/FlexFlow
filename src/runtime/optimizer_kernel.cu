@@ -240,8 +240,10 @@ __host__ void AdamOptimizer::nccl_unified_update_task_gpu(
   cudaEventRecord(t_start2, stream);
 
   void *workSpace_ptr = meta->handle.workSpace;
-
+  auto totalUsedWorkspaceSize = 0;
+  
   for (int i = 0; i < op->parameters_num; i++) {
+    totalUsedWorkspaceSize += size[i];
     cudaMemcpyAsync(workSpace_ptr,
                     accWGrads[i].get_float_ptr(),
                     size[i] * sizeof(float),
@@ -259,9 +261,11 @@ __host__ void AdamOptimizer::nccl_unified_update_task_gpu(
   printf("[optimizer] data copy time = %.2lfms\n", elapsed);
 
   // do allreduce once
+  printf("[optimizer] Number of parameters copied to buffer: %d \n", totalUsedWorkspaceSize);
   checkNCCL(ncclAllReduce(meta->handle.workSpace,
                           (float *)meta->handle.workSpace,
-                          meta->handle.workSpaceSize,
+			  // meta->handle.workSpaceSize,
+			  totalUsedWorkspaceSize,
                           ncclFloat,
                           ncclSum,
                           meta->handle.ncclComm,
@@ -306,7 +310,7 @@ __host__ void AdamOptimizer::nccl_unified_update_task_gpu(
   cudaEventDestroy(t_start);
   cudaEventDestroy(t_end);
   printf("[optimizer] total time = %.2lfms\n", elapsed);
-  assert(false);
+  //  assert(false);
 }
 #endif
 
