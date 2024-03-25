@@ -6,6 +6,7 @@
 #include <tuple>
 #include <type_traits>
 #include <vector>
+#include <cstdint>
 
 // Copied directly from
 // https://github.com/boostorg/container_hash/blob/master/include/boost/container_hash/detail/hash_mix.hpp

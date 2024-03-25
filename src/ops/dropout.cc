@@ -339,7 +339,7 @@ bool Dropout::measure_operator_cost(Simulator *sim,
         cost_metrics.total_mem_diff_from(sim->offset);
 
     backward = [=] {
-      backward_kernel_wrapper(m, output_grad_ptr, input_grad_ptr);
+      backward_kernel_wrapper(m, output_grad_acc, input_grad_acc);
     };
   }
 
