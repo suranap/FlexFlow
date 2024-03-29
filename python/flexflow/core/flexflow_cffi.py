@@ -2124,9 +2124,10 @@ class FFModel(object):
         for d in dataloaders:
           d.next_batch(self)
         self.forward()
-        self.zero_gradients()
+#        self.zero_gradients()
         self.backward()
-        self.update()
+#        self.update()
+        self.unified_update()
         self._ffconfig.end_trace(self._tracing_id)
           
   def eval(self, x=None, y=None, batch_size=None):

@@ -2429,7 +2429,7 @@ void FFModel::recompile_on_condition(RecompileState &r) {
 void FFModel::compute_metrics() {
   Op *final_operator = get_final_operator();
   assert(final_operator->numOutputs == 1);
-  metrics_op->compute(this, final_operator->outputs[0], parallel_label_tensor);
+  //  metrics_op->compute(this, final_operator->outputs[0], parallel_label_tensor);
 }
 
 void FFModel::get_metrics() {

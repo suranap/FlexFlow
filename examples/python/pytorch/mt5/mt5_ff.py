@@ -7,7 +7,7 @@ import torch
 from flexflow.core import *
 from flexflow.torch.model import PyTorchModel
 #from transformers import MT5ForConditionalGeneration, T5Tokenizer
-from transformers import BertForMaskedLM, BertTokenizer
+from transformers import BertForMaskedLM, BertTokenizer, BertConfig
 sys.path.append("./examples/python/pytorch/mt5")
 from mt5_torch import DataPreparer, get_dataloaders, set_seed
 
@@ -85,7 +85,11 @@ def top_level_task():
     ffconfig = FFConfig()
     ffmodel = FFModel(ffconfig)
     #model = MT5ForConditionalGeneration.from_pretrained("google/mt5-small")
-    model = BertForMaskedLM.from_pretrained("bert-base-uncased")
+
+    config = BertConfig()
+    # config.num_hidden_layers = 1
+
+    model = BertForMaskedLM.from_pretrained("bert-base-uncased", config=config)
     #model = BertModel.from_pretrained("bert-base-uncased")
     # Load train data as numpy arrays
     print("Loading data...")
@@ -101,6 +105,17 @@ def top_level_task():
     lm_labels = np.load(os.path.join(NUMPY_DIR, "train_labels.npy")).astype('int32')
     lm_labels = np.pad(lm_labels, ((0,0), (0,17)), 'constant')
     #lm_labels = np.random.randint(-1, 5, (1000, 512))
+
+    # (suranap): Increase data size
+    # ids = np.tile(ids, (5, 1))
+    # mask = np.tile(mask, (5, 1))
+    # lm_labels = np.tile(lm_labels, (5, 1))
+
+    # (suranap): Decrease data size
+    # ids = ids[:200]
+    # mask = mask[:200]
+    # lm_labels = lm_labels[:200]
+
     position_id = torch.arange(ids.shape[1], dtype=torch.int32).expand((1, -1)).numpy()
     token_type_ids = torch.zeros(ids.shape[1], dtype=torch.int32).expand((1, -1)).numpy()
 
