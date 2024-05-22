@@ -34,6 +34,7 @@ except:
 IR_DELIMITER = "; "
 INOUT_NODE_DELIMITER = ','
 
+GLOBAL_BATCH_SIZE = 0          # HACK!! Replace "%size_1" in graph with batch_size. This removes the dynamic query for batch size in the graph code.
 
 class Comparator(Enum):
     EQ = 0
@@ -205,6 +206,7 @@ class ModuleNode(Node):
 
     @staticmethod
     def construct_node(node, module):
+        print(f"ModuleNode:construct_node: module {module}", flush=True)
         if type(module) is torch.nn.modules.linear.Linear:
             return LinearNode(node, module)
         elif type(module) is torch.nn.modules.conv.Conv2d:
@@ -886,6 +888,7 @@ class FunctionNode(Node):
                 construct a corresponding :class:`Node`.
         """
         name = node.name
+        print(f"FunctionNode:construct_node: {name} {node}", flush=True) 
         if name.find("add") >= 0:
             if FunctionNode.is_right_scalar_op(node):
                 return ScalarAddNode(node, FunctionNode.ScalarPosition.RIGHT)
@@ -999,6 +1002,8 @@ class FunctionNode(Node):
 
     @staticmethod
     def get_view_shape(input_tensor, view_shape):
+        v = [GLOBAL_BATCH_SIZE if type(dim) is torch.fx.node.Node else dim for dim in view_shape]
+        view_shape = tuple(v)
         for dim in view_shape:
             assert type(dim) is int
 
@@ -1790,7 +1795,7 @@ class ExpandNode(FunctionNode):
         s.append(self.parse_inoutnodes(innodes))
         s.append(self.parse_inoutnodes(self.outnodes))
         s.append(enum_to_str(OpType, self.op_type))
-        args = self.innodes[1:]
+        args = (GLOBAL_BATCH_SIZE,) + self.innodes[2:] # HACK!! PyTorch leaves the dynamic batch size in here, rather than replace with %size variable
         expand_as = type(args[-1]) is not int
         if expand_as:
             tensors = []
@@ -1986,8 +1991,12 @@ class ViewNode(FunctionNode):
         s.append(self.parse_inoutnodes(self.outnodes))
         s.append(enum_to_str(OpType, self.op_type))
         for dim in self.innodes[1:]:
-            assert type(dim) is int
-            s.append(str(dim))
+            if type(dim) is torch.fx.node.Node:
+                s.append(str(GLOBAL_BATCH_SIZE))
+            elif type(dim) is int:
+                s.append(str(dim))
+            else:
+                assert False, f"Invalid type in dimensions of ViewNode {self.name}"
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
@@ -2512,7 +2521,12 @@ class PyTorchModel():
         # decouple the two implementations
 
     def _trace_model(self):
+        global GLOBAL_BATCH_SIZE
+        GLOBAL_BATCH_SIZE = self.batch_size 
         if self.is_hf_model:
+            # from traced_models import FxModule
+            # traced = FxModule()
+
             from transformers.utils.fx import \
                 symbolic_trace as hf_symbolic_trace
             traced = hf_symbolic_trace(
@@ -2524,10 +2538,11 @@ class PyTorchModel():
                 else hf_symbolic_trace(
                     self.model,
                     input_names=self.input_names,
-                    batch_size=self.batch_size,
+                    # batch_size=self.batch_size,
+                    batch_size=0,
                     sequence_length=self.seq_length,
                 )
-        
+
             #import pickle
             #with open('symbolic_trace', 'rb') as f:
                 #traced = pickle.load(f)
@@ -2540,7 +2555,11 @@ class PyTorchModel():
         for name, module in self.model.named_modules():
             name_to_module[name] = module
         graph = []
+
         for fx_node in traced.graph.nodes:
+            if fx_node.op == "call_method" and fx_node.target == "size":
+                continue        # HACK!! Skip the size function, replace %size with batch_size everywhere
+
             if fx_node.op == "call_module":
                 module_name = fx_node.target
                 module = name_to_module[module_name]
